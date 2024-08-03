@@ -1,95 +1,178 @@
+'use client';
 import Image from "next/image";
-import styles from "./page.module.css";
+// import styles from "./page.module.css";
+// import { Inventory, QrCodeScanner, Summarize } from "@mui/icons-material";
+import {
+  Button,
+  Grid,
+  Box,
+  Typography,
+  TextField,
+} from "@mui/material";
+import Divider from '@mui/material/Divider';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import CardMedia from '@mui/material/CardMedia';
+import CardActions from '@mui/material/CardActions';
+import { useState } from "react";
+import { initializeApp } from "firebase/app";
+import { addDoc, collection, deleteDoc, doc, getDocs, getFirestore } from 'firebase/firestore';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+
+const firebaseConfig = {
+  apiKey: process.env.FIREBASE_API_KEY,
+  authDomain: process.env.FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.FIREBASE_APP_ID
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+interface Item {
+  id: string;
+  title: string;
+  img: string;
+}
+
+const COLLECTION_NAME = 'pantry_items';
+
+async function storeAddItem(id: string, title: string, pictureFile: File) {
+  const storage = getStorage();
+  try {
+    const fileName = `images/${Date.now()}_${pictureFile.name}`;
+    const storageRef = ref(storage, fileName);
+
+    // Upload the image to Storage
+    await uploadBytes(storageRef, pictureFile);
+
+    const downloadUrl = await getDownloadURL(storageRef);
+    const docRef = await addDoc(collection(db, COLLECTION_NAME), {id, title, img: downloadUrl});
+    console.log("Document written with ID: ", docRef.id);
+  } catch (e) {
+    console.error("Error adding document: ", e);
+  }
+}
+
+async function storeGetItems() {
+  const itemsCollection = collection(db, COLLECTION_NAME);
+  const querySnapshot = await getDocs(itemsCollection);
+
+  const items: Item[] = [];
+  querySnapshot.forEach((doc) => {
+    items.push({ id: doc.id, ...doc.data() });
+  });
+
+  return items;
+}
+
+async function storeDeleteItem(itemId: string) {
+  try {
+    const docRef = doc(db, COLLECTION_NAME, itemId); 
+    await deleteDoc(docRef);
+    console.log("Document deleted successfully!");
+  } catch (e) {
+    console.error("Error deleting document: ", e);
+  }
+}
 
 export default function Home() {
+  const [items, setItems] = useState([]);
+  let [filteredItems, setFilteredItems] = useState([...items]);
+  let [imgFile, setImgFile] = useState(null);
+  let [title, setTitle] = useState("");
+  const refreshFilteredItem = () => {
+    setFilteredItems(items.filter((item) => item.title.toLowerCase().indexOf(title.toLowerCase()) >= 0));
+  };
+  const refresh = async () => {
+    const items = await storeGetItems();
+    console.log("Fetched");
+    console.log(items);
+    setItems(items);
+    refreshFilteredItem();
+  };
+  const newItem = async () => {
+    await storeAddItem("" + (1000000 + Math.floor(Math.random() * 1000000)), title, imgFile);
+    setTitle("");
+    await refresh();
+  };
+  const deleteItem = async (id: string) => {
+    await storeDeleteItem(id);
+    await refresh();
+  };
+  const updateSearch = (part: string) => {
+    setTitle(part);
+    refreshFilteredItem();
+  };
   return (
-    <main className={styles.main}>
-      <div className={styles.description}>
-        <p>
-          Get started by editing&nbsp;
-          <code className={styles.code}>app/page.tsx</code>
-        </p>
-        <div>
-          <a
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{" "}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className={styles.vercelLogo}
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
-        </div>
-      </div>
-
-      <div className={styles.center}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
+    <Box>
+      <div>
+        <Typography variant="h1">My pantry</Typography>
+        <TextField
+          hiddenLabel
+          id="search"
+          variant="outlined"
+          size="small"
+          value={title}
+          onChange={(event) => { updateSearch(event.target.value); }}
         />
+        <Button
+          variant="contained"
+          component="label"
+        >
+          Upload File
+          <input
+            hidden
+            type="file"
+            accept="image/*"
+            onChange={(event) => { setImgFile(event.target.files[0]); }}
+          />
+        </Button>
+        <Button
+          variant="contained"
+          onClick={() => { newItem(); }}
+        >
+          New item
+        </Button>
       </div>
-
-      <div className={styles.grid}>
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Docs <span>-&gt;</span>
-          </h2>
-          <p>Find in-depth information about Next.js features and API.</p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Learn <span>-&gt;</span>
-          </h2>
-          <p>Learn about Next.js in an interactive course with&nbsp;quizzes!</p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Templates <span>-&gt;</span>
-          </h2>
-          <p>Explore starter templates for Next.js.</p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Deploy <span>-&gt;</span>
-          </h2>
-          <p>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
+      <Button
+        variant="contained"
+        onClick={() => { refresh(); }}
+      >
+        Refresh
+      </Button>
+      <br />
+      <Divider />
+      <br />
+      <br />
+      <br />
+      <div>
+        <Grid container spacing={2}>
+          {filteredItems.map(
+            (item) => (
+              <Grid xs={4} key={item.id}>
+                <Card variant="outlined">
+                  <CardMedia
+                    sx={{ height: 140 }}
+                    image={item.img}
+                    title={item.title}
+                  />
+                  <CardContent>
+                    <Typography gutterBottom variant="h5" component="div">
+                      {item.title}
+                    </Typography>
+                  </CardContent>
+                  <CardActions>
+                    <Button size="small" onClick={() => { deleteItem(item.id) }}>Delete</Button>
+                  </CardActions>
+                </Card>
+              </Grid>
+            )
+          )}
+        </Grid>
       </div>
-    </main>
+    </Box>
   );
 }
