@@ -80,18 +80,13 @@ async function storeDeleteItem(itemId: string) {
 
 export default function Home() {
   const [items, setItems] = useState([]);
-  let [filteredItems, setFilteredItems] = useState([...items]);
   let [imgFile, setImgFile] = useState(null);
   let [title, setTitle] = useState("");
-  const refreshFilteredItem = () => {
-    setFilteredItems(items.filter((item) => item.title.toLowerCase().indexOf(title.toLowerCase()) >= 0));
-  };
   const refresh = async () => {
     const items = await storeGetItems();
     console.log("Fetched");
     console.log(items);
     setItems(items);
-    refreshFilteredItem();
   };
   const newItem = async () => {
     await storeAddItem("" + (1000000 + Math.floor(Math.random() * 1000000)), title, imgFile);
@@ -104,7 +99,6 @@ export default function Home() {
   };
   const updateSearch = (part: string) => {
     setTitle(part);
-    refreshFilteredItem();
   };
   return (
     <Box>
@@ -150,7 +144,7 @@ export default function Home() {
       <br />
       <div>
         <Grid container spacing={2}>
-          {filteredItems.map(
+          {items.filter((item) => item.title.toLowerCase().indexOf(title.toLowerCase()) >= 0).map(
             (item) => (
               <Grid xs={4} key={item.id}>
                 <Card variant="outlined">
