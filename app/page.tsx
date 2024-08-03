@@ -62,7 +62,8 @@ async function storeGetItems() {
 
   const items: Item[] = [];
   querySnapshot.forEach((doc) => {
-    items.push({ id: doc.id, ...doc.data() });
+    const { title, img } = doc.data();
+    items.push({ id: doc.id, title, img });
   });
 
   return items;
@@ -79,8 +80,8 @@ async function storeDeleteItem(itemId: string) {
 }
 
 export default function Home() {
-  const [items, setItems] = useState([]);
-  let [imgFile, setImgFile] = useState(null);
+  const [items, setItems] = useState([] as Item[]);
+  let [imgFile, setImgFile] = useState<File | undefined>(undefined);
   let [title, setTitle] = useState("");
   const refresh = async () => {
     const items = await storeGetItems();
@@ -89,9 +90,11 @@ export default function Home() {
     setItems(items);
   };
   const newItem = async () => {
-    await storeAddItem("" + (1000000 + Math.floor(Math.random() * 1000000)), title, imgFile);
-    setTitle("");
-    await refresh();
+    if (imgFile) {
+      await storeAddItem("" + (1000000 + Math.floor(Math.random() * 1000000)), title, imgFile);
+      setTitle("");
+      await refresh();
+    }
   };
   const deleteItem = async (id: string) => {
     await storeDeleteItem(id);
@@ -121,7 +124,7 @@ export default function Home() {
             hidden
             type="file"
             accept="image/*"
-            onChange={(event) => { setImgFile(event.target.files[0]); }}
+            onChange={(event) => { setImgFile(event.target.files?.[0]); }}
           />
         </Button>
         <Button
